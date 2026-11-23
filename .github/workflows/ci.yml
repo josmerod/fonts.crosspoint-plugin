@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test
+        run: node --test tests/
+      - name: Validate against Plugin Hub discovery rules
+        run: python -I tests/validate_against_hub.py fonts.crosspoint-plugin
+      - name: Validate manifest against Plugin Hub rules
+        run: |
+          node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync("fonts.crosspoint-plugin/manifest.json", "utf8"));
+            const fail = (m) => { console.error("manifest: " + m); process.exit(1); };
+            if (!/^[a-z0-9-]+$/.test(m.name || "")) fail("name must be lowercase letters, digits, hyphens");
+            if (!/^\d+\.\d+\.\d+$/.test(m.version || "")) fail("version must be MAJOR.MINOR.PATCH");
+            const hasRuntime = ["plugin.js", "device.json"].some((f) => fs.existsSync("fonts.crosspoint-plugin/" + f));
+            if (!hasRuntime) fail("plugin.js or device.json is required");
+            for (const f of m.files || []) {
+              if (/(^\/|\\|\.\.)/.test(f)) fail("unsafe path in files: " + f);
+              if (!fs.existsSync("fonts.crosspoint-plugin/" + f)) fail("declared file missing: " + f);
+            }
+            console.log("manifest OK: " + m.name + " " + m.version);
+          '
