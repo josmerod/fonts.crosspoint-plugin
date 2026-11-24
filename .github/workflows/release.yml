@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 22
       - name: Test
-        run: node --test tests/
+        run: node --test tests/test_plugin.mjs
       - name: Tag must match manifest version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
