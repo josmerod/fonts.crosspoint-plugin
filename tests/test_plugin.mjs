@@ -5,6 +5,11 @@ import vm from 'node:vm';
 
 const PAYLOAD = new URL('../fonts.crosspoint-plugin/', import.meta.url);
 
+// A family count goes stale as soon as the catalog grows, and the catalog
+// grows without a plugin release. (The 128 installed-family limit is a device
+// constant, not a count.)
+const STALE_FAMILY_COUNT = /\b\d+ (precompiled |font |catalog )+(\.cpfont )?\bfamil(y|ies)\b/i;
+
 async function loadPlugin(globals = {}) {
   let render;
   const context = vm.createContext({
@@ -175,6 +180,82 @@ test('manifest follows the Plugin Hub contract', async () => {
     await readFile(new URL(file, PAYLOAD)); // every declared runtime file exists
   }
   assert.equal(manifest.compatibility.firmware_family[0], 'crosspoint');
+  // The catalog grows without a plugin release, so the description must not
+  // count families.
+  assert.doesNotMatch(manifest.description, STALE_FAMILY_COUNT);
+});
+
+// The reader shows an installed plugin's README.md in a plain paged text
+// viewer: there is no Markdown rendering, and the file must fit in RAM.
+const README_LIMIT = 16 * 1024;
+test('README reads as plain text on the reader', async () => {
+  const readme = await readFile(new URL('README.md', PAYLOAD), 'utf8');
+  assert.ok(Buffer.byteLength(readme) <= README_LIMIT, 'the reader refuses a README over 16 KB');
+  // The reader draws it with the active reading font, which may lack the glyph.
+  assert.doesNotMatch(readme, /[^\x00-\x7F]/, 'non-ASCII character');
+  // Shown raw on the reader; setext headings, "- " and "1. " lists are not.
+  for (const [markup, what] of [
+    [/\*\*/, 'bold'], [/`/, 'code'], [/\]\(https?:\/\//, 'link'], [/^#{1,6}\s/m, 'ATX heading'],
+    [/<\/?[a-z][^>]*>/i, 'HTML tag'], [/^\s*\|.*\|\s*$/m, 'table'], [/\s{2,}$/, 'hard line break'],
+  ]) {
+    assert.doesNotMatch(readme, markup, what + ' markup is shown raw');
+  }
+  // The web UI hostname is not the same on every device/firmware.
+  assert.doesNotMatch(readme, /crosspoint\.local/i, 'device-specific hostname');
+  assert.doesNotMatch(readme, STALE_FAMILY_COUNT, 'family count that goes stale');
+});
+
+// Plugin Hub converts DETAILS.md with a small Markdown subset (see
+// markdown_details_to_html in tools/build_catalog.py of
+// crosspoint-reader/crosspoint-plugin-hub) and the reader lays that HTML out
+// with its reading engine. Anything outside the subset is shown verbatim.
+const DETAILS_SOURCE_LIMIT = 16 * 1024;
+const DETAILS_HTML_LIMIT = 24 * 1024;
+function hubDetailsHtml(markdown) {
+  const inline = (text) => text.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+  const output = [];
+  let paragraph = [];
+  let inList = false;
+  const flushParagraph = () => {
+    if (paragraph.length) { output.push(`<p>${inline(paragraph.join(' '))}</p>`); paragraph = []; }
+  };
+  const closeList = () => { if (inList) { output.push('</ul>'); inList = false; } };
+  for (const rawLine of markdown.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) { flushParagraph(); closeList(); continue; }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph(); closeList();
+      output.push(`<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>`);
+    } else if (line.startsWith('- ')) {
+      flushParagraph();
+      if (!inList) { output.push('<ul>'); inList = true; }
+      output.push(`<li>${inline(line.slice(2))}</li>`);
+    } else { closeList(); paragraph.push(line); }
+  }
+  flushParagraph(); closeList();
+  return output.join('\n').trim() + '\n';
+}
+
+test('DETAILS renders cleanly through the Plugin Hub converter', async () => {
+  const source = await readFile(new URL('DETAILS.md', PAYLOAD), 'utf8');
+  assert.ok(Buffer.byteLength(source) <= DETAILS_SOURCE_LIMIT, 'the hub rejects DETAILS.md over 16 KB');
+  assert.doesNotMatch(source, /[^\x00-\x7F]/, 'non-ASCII character');
+
+  const html = hubDetailsHtml(source);
+  assert.ok(Buffer.byteLength(html) <= DETAILS_HTML_LIMIT, 'the hub rejects rendered details over 24 KB');
+  // Links are not in the subset: "[text](url)" would be shown verbatim.
+  assert.doesNotMatch(html, /\]\(https?:\/\//, 'Markdown link');
+  assert.doesNotMatch(html, /[*`]/, 'unconverted inline markup');
+  // A list item must be a single line, or the converter splits it into an
+  // item followed by a stray paragraph.
+  assert.doesNotMatch(html, /<\/li>\n<p>/, 'list item continued on the next line');
+  assert.doesNotMatch(html, /<\/ul>\n<p>[a-z]/, 'paragraph glued to a list');
+  assert.doesNotMatch(source, /crosspoint\.local/i, 'device-specific hostname');
+  assert.doesNotMatch(source, STALE_FAMILY_COUNT, 'family count that goes stale');
 });
 
 test('installs selected sizes, refreshes the registry in place, sets the active family, removes', async () => {
