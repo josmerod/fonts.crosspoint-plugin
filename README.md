@@ -11,6 +11,9 @@ discovers automatically. Everything else here is development material.
   [README](fonts.crosspoint-plugin/README.md).
 - **Fonts**: the catalog is built by [josmerod/cp-fonts](https://github.com/josmerod/cp-fonts);
   this plugin only consumes it, so new families appear without a plugin release.
+  Its scheduled build keeps the catalog alive — if this badge is not passing,
+  installs may fail:
+  [![Build fonts](https://github.com/josmerod/cp-fonts/actions/workflows/build-fonts.yml/badge.svg)](https://github.com/josmerod/cp-fonts/actions/workflows/build-fonts.yml)
 
 ## Development
 
