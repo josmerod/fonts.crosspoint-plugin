@@ -3,7 +3,7 @@
   "title": "Fonts",
   "description": "Browse a catalog of precompiled .cpfont font families (6-18pt), preview them, choose sizes and install straight to the SD card.",
   "author": "José Mejías (josmerod)",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "mount": "settings",
   "compatibility": {
     "firmware_family": ["crosspoint"],
