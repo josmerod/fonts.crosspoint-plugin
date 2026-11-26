@@ -194,9 +194,11 @@ test('README reads as plain text on the reader', async () => {
   // The reader draws it with the active reading font, which may lack the glyph.
   assert.doesNotMatch(readme, /[^\x00-\x7F]/, 'non-ASCII character');
   // Shown raw on the reader; setext headings, "- " and "1. " lists are not.
+  // A hard line break is trailing spaces before a line end, not the CR of a
+  // CRLF checkout.
   for (const [markup, what] of [
     [/\*\*/, 'bold'], [/`/, 'code'], [/\]\(https?:\/\//, 'link'], [/^#{1,6}\s/m, 'ATX heading'],
-    [/<\/?[a-z][^>]*>/i, 'HTML tag'], [/^\s*\|.*\|\s*$/m, 'table'], [/\s{2,}$/, 'hard line break'],
+    [/<\/?[a-z][^>]*>/i, 'HTML tag'], [/^\s*\|.*\|\s*$/m, 'table'], [/\S[ \t]{2,}\r?$/m, 'hard line break'],
   ]) {
     assert.doesNotMatch(readme, markup, what + ' markup is shown raw');
   }
