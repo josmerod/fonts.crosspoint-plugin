@@ -1,7 +1,7 @@
 {
   "name": "fonts",
   "title": "Fonts",
-  "description": "Browse a catalog of 289 precompiled .cpfont families (6-18pt), preview them, choose sizes and install straight to the SD card.",
+  "description": "Browse a catalog of precompiled .cpfont font families (6-18pt), preview them, choose sizes and install straight to the SD card.",
   "author": "José Mejías (josmerod)",
   "version": "0.6.0",
   "mount": "settings",
