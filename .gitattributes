@@ -1,0 +1,4 @@
+# The reader shows README.md raw and the Plugin Hub converts DETAILS.md, from
+# the tag and from a folder copied to the SD card by hand: ship them as they
+# sit in the repository, whatever the checkout's core.autocrlf.
+fonts.crosspoint-plugin/** text eol=lf
